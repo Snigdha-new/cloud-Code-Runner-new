@@ -6,6 +6,9 @@ const path = require("path");
 const mongoose = require("mongoose");
 
 const app = express();
+//new added
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
 app.use(cors());
 app.use(express.json());
@@ -21,6 +24,13 @@ mongoose.connect("mongodb://madirajuis23_db_user:1996S2005@ac-gjon4eh-shard-00-0
 const Project = mongoose.model("Project", {
   name: String,
   code: String,
+  userId: String,
+});
+
+//new added
+const User = mongoose.model("User", {
+  username: String,
+  password: String,
 });
 
 /* ================== ROUTES ================== */
@@ -28,6 +38,70 @@ const Project = mongoose.model("Project", {
 // Test route
 app.get("/", (req, res) => {
   res.send("Backend is running 🚀");
+});
+
+//new added
+app.post("/signup", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    // check existing user
+    const existingUser = await User.findOne({ username });
+
+    if (existingUser) {
+      return res.json({ error: "User already exists" });
+    }
+
+    // hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // create user
+    const user = new User({
+      username,
+      password: hashedPassword,
+    });
+
+    await user.save();
+
+    res.json({ message: "Signup successful" });
+  } catch (err) {
+    console.log(err);
+    res.json({ error: "Signup failed" });
+  }
+});
+
+app.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.json({ error: "User not found" });
+    }
+
+    // compare passwords
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.json({ error: "Invalid password" });
+    }
+
+    // create token
+    const token = jwt.sign(
+      { id: user._id },
+      "secretkey"
+    );
+
+    res.json({
+      message: "Login successful",
+      token,
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.json({ error: "Login failed" });
+  }
 });
 
 /* ---------- RUN CODE ---------- */
@@ -63,34 +137,63 @@ app.post("/run", (req, res) => {
 });
 
 /* ---------- SAVE PROJECT ---------- */
-app.post("/save", async (req, res) => {
+app.post("/save", verifyToken, async (req, res) => {
   try {
     const { name, code } = req.body;
 
-    if (!name) {
-      return res.json({ error: "Project name required" });
-    }
+    const project = new Project({
+      name,
+      code,
+      userId: req.user.id,
+    });
 
-    const project = new Project({ name, code });
     await project.save();
 
-    res.json({ message: "Saved successfully" });
+    res.json({
+      message: "Saved successfully",
+    });
+
   } catch (err) {
     console.log(err);
-    res.json({ error: "Save failed" });
+
+    res.json({
+      error: "Save failed",
+    });
   }
 });
 
 /* ---------- GET PROJECTS ---------- */
-app.get("/projects", async (req, res) => {
+app.get("/projects", verifyToken, async (req, res) => {
   try {
-    const projects = await Project.find();
+
+    const projects = await Project.find({
+      userId: req.user.id,
+    });
+
     res.json(projects);
+
   } catch (err) {
     console.log(err);
     res.json([]);
   }
 });
+
+//2 new
+function verifyToken(req, res, next) {
+  const token = req.headers.authorization;
+
+  if (!token) {
+    return res.json({ error: "Access denied" });
+  }
+
+  try {
+    const verified = jwt.verify(token, "secretkey");
+    req.user = verified;
+    next();
+  } catch {
+    res.json({ error: "Invalid token" });
+  }
+}
 
 /* ================== SERVER ================== */
 
