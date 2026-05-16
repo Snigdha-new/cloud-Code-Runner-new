@@ -105,34 +105,120 @@ app.post("/login", async (req, res) => {
 });
 
 /* ---------- RUN CODE ---------- */
+// app.post("/run", (req, res) => {
+//   console.log("Request received");
+
+//   const { code, language } = req.body;
+
+//   const filePath = path.join(__dirname, "temp.py");
+
+//   fs.writeFileSync(filePath, code);
+
+//   let dir = __dirname.replace(/\\/g, "/");
+//   dir = dir.replace(/^([A-Z]):/, (match, p1) => `/${p1.toLowerCase()}`);
+
+//   const command = `docker run --rm -v ${dir}:/app -w /app python:3.11-alpine python temp.py`;
+
+//   exec(command, (error, stdout, stderr) => {
+//     try {
+//       fs.unlinkSync(filePath);
+//     } catch {}
+
+//     if (error) {
+//       return res.json({
+//         error: stderr || "Execution error",
+//       });
+//     }
+
+//     res.json({
+//       output: stdout || stderr || "No output",
+//     });
+//   });
+// });
+
 app.post("/run", (req, res) => {
   console.log("Request received");
 
-  const code = req.body.code;
+  const { code, language } = req.body;
 
-  const filePath = path.join(__dirname, "temp.py");
+  console.log("Language:", language);
+
+  let fileName = "";
+  let command = "";
+
+  // PYTHON
+  if (language === "python") {
+
+    fileName = "temp.py";
+
+  }
+
+  // JAVASCRIPT
+  else if (language === "javascript") {
+
+    fileName = "temp.js";
+
+  }
+
+  // INVALID
+  else {
+
+    return res.json({
+      error: "Unsupported language",
+    });
+
+  }
+
+  const filePath = path.join(__dirname, fileName);
 
   fs.writeFileSync(filePath, code);
 
   let dir = __dirname.replace(/\\/g, "/");
-  dir = dir.replace(/^([A-Z]):/, (match, p1) => `/${p1.toLowerCase()}`);
 
-  const command = `docker run --rm -v ${dir}:/app -w /app python:3.11-alpine python temp.py`;
+  dir = dir.replace(
+    /^([A-Z]):/,
+    (match, p1) => `/${p1.toLowerCase()}`
+  );
+
+  // PYTHON
+  if (language === "python") {
+
+    command =
+      `docker run --rm -v ${dir}:/app -w /app python:3.11-alpine python ${fileName}`;
+
+  }
+
+  // JAVASCRIPT
+  else if (language === "javascript") {
+
+    command =
+      `docker run --rm -v ${dir}:/app -w /app node:20-alpine node ${fileName}`;
+
+  }
+
+  console.log("Running command:", command);
 
   exec(command, (error, stdout, stderr) => {
+
     try {
       fs.unlinkSync(filePath);
     } catch {}
 
+    console.log("STDOUT:", stdout);
+    console.log("STDERR:", stderr);
+
     if (error) {
+
       return res.json({
         error: stderr || "Execution error",
       });
+
     }
 
     res.json({
       output: stdout || stderr || "No output",
     });
+
   });
 });
 

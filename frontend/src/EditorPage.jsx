@@ -8,6 +8,7 @@ function EditorPage() {
   const [output, setOutput] = useState("");
   const [name, setName] = useState("");
   const [projects, setProjects] = useState([]);
+  const [language, setLanguage] = useState("python");
 
   const navigate = useNavigate();
 
@@ -25,6 +26,7 @@ function EditorPage() {
     try {
       const res = await axios.post("http://localhost:5000/run", {
         code,
+        language,
       });
 
       setOutput(res.data.output || res.data.error);
@@ -41,6 +43,7 @@ function EditorPage() {
         {
           name,
           code,
+          language,
         },
         {
           headers: {
@@ -189,8 +192,29 @@ function EditorPage() {
               display: "flex",
               gap: "10px",
               marginBottom: "15px",
+              alignItems: "center",
             }}
           >
+            {/* LANGUAGE DROPDOWN */}
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              style={{
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid rgba(255,255,255,0.1)",
+                background: "#111827",
+                color: "white",
+                fontSize: "15px",
+                cursor: "pointer",
+                outline: "none",
+                minWidth: "160px",
+                boxShadow: "0px 0px 10px rgba(0,0,0,0.3)",
+              }}
+            >
+              <option value="python">🐍 Python</option>
+              <option value="javascript">🟨 JavaScript</option>
+            </select>
             <input
               placeholder="Project Name"
               value={name}
@@ -246,7 +270,7 @@ function EditorPage() {
           >
             <Editor
               height="500px"
-              defaultLanguage="python"
+              language={language}
               value={code}
               onChange={(value) => setCode(value)}
               theme="vs-dark"
