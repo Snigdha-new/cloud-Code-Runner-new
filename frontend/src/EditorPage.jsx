@@ -76,7 +76,28 @@ function EditorPage() {
       alert("Failed to load projects");
     }
   };
+ const downloadCode = () => {
 
+  const extensions = {
+    python: "py",
+    javascript: "js",
+    cpp: "cpp",
+  };
+
+  const element = document.createElement("a");
+
+  const file = new Blob([code], {
+    type: "text/plain",
+  });
+
+  element.href = URL.createObjectURL(file);
+
+  element.download = `code.${extensions[language]}`;
+
+  document.body.appendChild(element);
+
+  element.click();
+};
   const logout = () => {
     localStorage.removeItem("token");
     navigate("/");
@@ -257,6 +278,19 @@ function EditorPage() {
             >
               ▶ Run
             </button>
+            <button
+  onClick={downloadCode}
+  style={{
+    padding: "12px 20px",
+    background: "#f59e0b",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+  }}
+>
+  ⬇ Download
+</button>
           </div>
 
           {/* EDITOR */}
