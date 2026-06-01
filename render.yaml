@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: cloud-code-runner
+    runtime: node
+    plan: standard
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        scope: build,runtime
+      - key: JWT_SECRET
+        scope: runtime
+      - key: PORT
+        value: "5000"
