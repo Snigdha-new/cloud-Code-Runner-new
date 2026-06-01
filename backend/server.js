@@ -1,33 +1,43 @@
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const { exec } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
-
-const app = express();
-//new added
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
+const app = express();
+
+const bcrypt_require = require("bcryptjs");
+const jwt_require = require("jsonwebtoken");
 
 app.use(cors());
 app.use(express.json());
 
+/* ================== ENVIRONMENT VARIABLES ================== */
+
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://madirajuis23_db_user:1996S2005@ac-gjon4eh-shard-00-00.c51cmha.mongodb.net:27017,ac-gjon4eh-shard-00-01.c51cmha.mongodb.net:27017,ac-gjon4eh-shard-00-02.c51cmha.mongodb.net:27017/?ssl=true&replicaSet=atlas-13vz6n-shard-0&authSource=admin&retryWrites=true&w=majority";
+const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
+const PORT = process.env.PORT || 5000;
+const NODE_ENV = process.env.NODE_ENV || "development";
+
 /* ================== MONGODB CONNECTION ================== */
 
-mongoose.connect("mongodb://madirajuis23_db_user:1996S2005@ac-gjon4eh-shard-00-00.c51cmha.mongodb.net:27017,ac-gjon4eh-shard-00-01.c51cmha.mongodb.net:27017,ac-gjon4eh-shard-00-02.c51cmha.mongodb.net:27017/codeRunner?ssl=true&replicaSet=atlas-srkqtw-shard-0&authSource=admin&retryWrites=true&w=majority")
+mongoose.connect(MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
-  .catch(err => console.log(err));
+  .catch(err => console.log("MongoDB connection error:", err));
 
 /* ================== SCHEMA ================== */
 
 const Project = mongoose.model("Project", {
   name: String,
   code: String,
+  language: String,
   userId: String,
 });
 
-//new added
 const User = mongoose.model("User", {
   username: String,
   password: String,
@@ -40,7 +50,7 @@ app.get("/", (req, res) => {
   res.send("Backend is running 🚀");
 });
 
-//new added
+// Signup route
 app.post("/signup", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -70,6 +80,7 @@ app.post("/signup", async (req, res) => {
   }
 });
 
+// Login route
 app.post("/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -87,10 +98,10 @@ app.post("/login", async (req, res) => {
       return res.json({ error: "Invalid password" });
     }
 
-    // create token
+    // create token using JWT_SECRET from env
     const token = jwt.sign(
       { id: user._id },
-      "secretkey"
+      JWT_SECRET
     );
 
     res.json({
@@ -105,37 +116,6 @@ app.post("/login", async (req, res) => {
 });
 
 /* ---------- RUN CODE ---------- */
-// app.post("/run", (req, res) => {
-//   console.log("Request received");
-
-//   const { code, language } = req.body;
-
-//   const filePath = path.join(__dirname, "temp.py");
-
-//   fs.writeFileSync(filePath, code);
-
-//   let dir = __dirname.replace(/\\/g, "/");
-//   dir = dir.replace(/^([A-Z]):/, (match, p1) => `/${p1.toLowerCase()}`);
-
-//   const command = `docker run --rm -v ${dir}:/app -w /app python:3.11-alpine python temp.py`;
-
-//   exec(command, (error, stdout, stderr) => {
-//     try {
-//       fs.unlinkSync(filePath);
-//     } catch {}
-
-//     if (error) {
-//       return res.json({
-//         error: stderr || "Execution error",
-//       });
-//     }
-
-//     res.json({
-//       output: stdout || stderr || "No output",
-//     });
-//   });
-// });
-
 app.post("/run", (req, res) => {
   console.log("Request received");
 
@@ -148,25 +128,17 @@ app.post("/run", (req, res) => {
 
   // PYTHON
   if (language === "python") {
-
     fileName = "temp.py";
-
   }
-
   // JAVASCRIPT
   else if (language === "javascript") {
-
     fileName = "temp.js";
-
   }
-
   // INVALID
   else {
-
     return res.json({
       error: "Unsupported language",
     });
-
   }
 
   const filePath = path.join(__dirname, fileName);
@@ -182,24 +154,18 @@ app.post("/run", (req, res) => {
 
   // PYTHON
   if (language === "python") {
-
     command =
       `docker run --rm -v ${dir}:/app -w /app python:3.11-alpine python ${fileName}`;
-
   }
-
   // JAVASCRIPT
   else if (language === "javascript") {
-
     command =
       `docker run --rm -v ${dir}:/app -w /app node:20-alpine node ${fileName}`;
-
   }
 
   console.log("Running command:", command);
 
   exec(command, (error, stdout, stderr) => {
-
     try {
       fs.unlinkSync(filePath);
     } catch {}
@@ -208,28 +174,26 @@ app.post("/run", (req, res) => {
     console.log("STDERR:", stderr);
 
     if (error) {
-
       return res.json({
         error: stderr || "Execution error",
       });
-
     }
 
     res.json({
       output: stdout || stderr || "No output",
     });
-
   });
 });
 
 /* ---------- SAVE PROJECT ---------- */
 app.post("/save", verifyToken, async (req, res) => {
   try {
-    const { name, code } = req.body;
+    const { name, code, language } = req.body;
 
     const project = new Project({
       name,
       code,
+      language,
       userId: req.user.id,
     });
 
@@ -241,7 +205,6 @@ app.post("/save", verifyToken, async (req, res) => {
 
   } catch (err) {
     console.log(err);
-
     res.json({
       error: "Save failed",
     });
@@ -251,7 +214,6 @@ app.post("/save", verifyToken, async (req, res) => {
 /* ---------- GET PROJECTS ---------- */
 app.get("/projects", verifyToken, async (req, res) => {
   try {
-
     const projects = await Project.find({
       userId: req.user.id,
     });
@@ -264,7 +226,8 @@ app.get("/projects", verifyToken, async (req, res) => {
   }
 });
 
-//2 new
+/* ================== MIDDLEWARE ================== */
+
 function verifyToken(req, res, next) {
   const token = req.headers.authorization;
 
@@ -273,7 +236,7 @@ function verifyToken(req, res, next) {
   }
 
   try {
-    const verified = jwt.verify(token, "secretkey");
+    const verified = jwt.verify(token, JWT_SECRET);
     req.user = verified;
     next();
   } catch {
@@ -281,8 +244,18 @@ function verifyToken(req, res, next) {
   }
 }
 
-/* ================== SERVER ================== */
+/* ================== SERVE FRONTEND IN PRODUCTION ================== */
 
-app.listen(5000, () => {
-  console.log("Backend running on http://localhost:5000");
+if (NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist/index.html'));
+  });
+}
+
+/* ================== START SERVER ================== */
+
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
 });
